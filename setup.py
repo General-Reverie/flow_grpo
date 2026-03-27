@@ -9,9 +9,9 @@ setup(
         "torch==2.6.0",
         "torchvision==0.21.0",
         "torchaudio",
-        "transformers==4.40.0",
-        "accelerate==1.4.0",
-        "diffusers==0.33.1", 
+        "transformers>=4.44.0",
+        "accelerate>=1.4.0",
+        "diffusers>=0.37.1",
         
         "numpy==1.26.4",
         "pandas==2.2.3",
@@ -31,16 +31,16 @@ setup(
         
         # "flash-attn==2.7.4.post1",
         "deepspeed==0.16.4",  
-        "peft==0.10.0",       
+        "peft>=0.13.0",
         "bitsandbytes==0.45.3",
         
         "aiohttp==3.11.13",
         "fastapi==0.115.11", 
         "uvicorn==0.34.0",
         
-        "huggingface-hub==0.29.1",  
-        "datasets==3.3.2",
-        "tokenizers==0.19.1",
+        "huggingface-hub>=0.29.1",
+        "datasets>=3.3.2",
+        "tokenizers>=0.19.1",
         
         "einops==0.8.1",
         "nvidia-ml-py==12.570.86",
