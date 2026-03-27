@@ -177,39 +177,37 @@ def compute_log_prob(transformer, pipeline, sample, j, config):
     return prev_sample, log_prob, prev_sample_mean, std_dev_t
 
 
-def discover_lora_targets(transformer):
+def get_klein_lora_targets():
     """
-    Auto-discover LoRA target modules from the Klein transformer architecture.
-    Targets attention projections and feed-forward layers, matching the FLUX.1 pattern.
+    Verified LoRA target modules for Flux2Transformer2DModel (Klein-base-4B).
+
+    Discovered from actual model inspection on 2026-03-27:
+    - 5 dual-stream blocks (transformer_blocks.0-4)
+    - 20 single-stream blocks (single_transformer_blocks.0-19)
+
+    Dual blocks: separate Q/K/V + add_q/k/v for cross-attention, linear_in/out for FFN
+    Single blocks: fused to_qkv_mlp_proj, to_out for attention
     """
-    target_patterns = []
-    seen_patterns = set()
-
-    for name, module in transformer.named_modules():
-        # Skip top-level
-        if '.' not in name:
-            continue
-        # Get the relative pattern (e.g., "attn.to_k" from "transformer_blocks.0.attn.to_k")
-        parts = name.split('.')
-        # Find attention and FF patterns
-        for i, part in enumerate(parts):
-            if part in ('attn', 'ff', 'ff_context'):
-                pattern = '.'.join(parts[i:])
-                if pattern not in seen_patterns and hasattr(module, 'weight'):
-                    seen_patterns.add(pattern)
-                    target_patterns.append(pattern)
-
-    if not target_patterns:
-        # Fallback: use standard FLUX-like targets
-        logger.warning("Could not auto-discover LoRA targets, using FLUX.1 defaults")
-        target_patterns = [
-            "attn.to_k", "attn.to_q", "attn.to_v", "attn.to_out.0",
-            "attn.add_k_proj", "attn.add_q_proj", "attn.add_v_proj", "attn.to_add_out",
-            "ff.net.0.proj", "ff.net.2",
-            "ff_context.net.0.proj", "ff_context.net.2",
-        ]
-
-    return target_patterns
+    return [
+        # Dual-stream blocks — image attention
+        "attn.to_q",
+        "attn.to_k",
+        "attn.to_v",
+        "attn.to_out.0",
+        # Dual-stream blocks — text (context) attention
+        "attn.add_q_proj",
+        "attn.add_k_proj",
+        "attn.add_v_proj",
+        "attn.to_add_out",
+        # Dual-stream blocks — image FFN (Klein uses linear_in/linear_out, not net.0.proj/net.2)
+        "ff.linear_in",
+        "ff.linear_out",
+        # Dual-stream blocks — context FFN
+        "ff_context.linear_in",
+        "ff_context.linear_out",
+        # Single-stream blocks — fused QKV+MLP projection
+        "attn.to_qkv_mlp_proj",
+    ]
 
 
 def eval(pipeline, test_dataloader, config, accelerator, global_step, reward_fn, executor, autocast, num_train_timesteps, ema, transformer_trainable_parameters):
@@ -339,8 +337,8 @@ def main(_):
     pipeline.transformer.to(accelerator.device)
 
     if config.use_lora:
-        # Auto-discover LoRA targets from Klein transformer
-        target_modules = discover_lora_targets(pipeline.transformer)
+        # Verified LoRA targets for Klein (Flux2Transformer2DModel)
+        target_modules = get_klein_lora_targets()
         logger.info(f"LoRA target modules: {target_modules}")
 
         transformer_lora_config = LoraConfig(

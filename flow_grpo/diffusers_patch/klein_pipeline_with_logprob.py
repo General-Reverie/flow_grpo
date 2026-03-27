@@ -15,6 +15,26 @@ from diffusers.pipelines.stable_diffusion_3.pipeline_stable_diffusion_3 import r
 from .sd3_sde_with_logprob import sde_step_with_logprob
 
 
+def compute_empirical_mu(image_seq_len: int, num_steps: int) -> float:
+    """
+    Compute mu for timestep shifting based on sequence length and step count.
+    Copied from Flux2KleinPipeline source (not exposed as public method in some versions).
+    """
+    a1, b1 = 8.73809524e-05, 1.89833333
+    a2, b2 = 0.00016927, 0.45666666
+
+    if image_seq_len > 4300:
+        mu = a2 * image_seq_len + b2
+        return float(mu)
+
+    m_200 = a2 * image_seq_len + b2
+    m_10 = a1 * image_seq_len + b1
+    a = (m_200 - m_10) / 190.0
+    b = m_200 - 200.0 * a
+    mu = a * num_steps + b
+    return float(mu)
+
+
 @torch.no_grad()
 def pipeline_with_logprob(
     self,
@@ -89,7 +109,11 @@ def pipeline_with_logprob(
 
     # 4. Prepare timesteps with empirical mu shift
     image_seq_len = latents.shape[1]
-    mu = self.compute_empirical_mu(image_seq_len, num_inference_steps)
+    # Use standalone function (not always a pipeline method in all diffusers versions)
+    if hasattr(self, 'compute_empirical_mu'):
+        mu = self.compute_empirical_mu(image_seq_len, num_inference_steps)
+    else:
+        mu = compute_empirical_mu(image_seq_len, num_inference_steps)
     timesteps, num_inference_steps = retrieve_timesteps(
         self.scheduler,
         num_inference_steps,
