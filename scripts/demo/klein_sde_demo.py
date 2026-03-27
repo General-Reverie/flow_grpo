@@ -33,7 +33,9 @@ def main():
     print(f"Transformer num_layers (dual): {pipe.transformer.config.num_layers}")
     print(f"Transformer num_single_layers: {pipe.transformer.config.num_single_layers}")
     print(f"Transformer guidance_embeds: {pipe.transformer.config.guidance_embeds}")
-    print(f"VAE scaling_factor: {pipe.vae.config.scaling_factor}")
+    print(f"VAE config keys: {list(pipe.vae.config.keys()) if hasattr(pipe.vae.config, 'keys') else dir(pipe.vae.config)}")
+    if hasattr(pipe.vae.config, 'scaling_factor'):
+        print(f"VAE scaling_factor: {pipe.vae.config.scaling_factor}")
     if hasattr(pipe.vae.config, 'shift_factor'):
         print(f"VAE shift_factor: {pipe.vae.config.shift_factor}")
 

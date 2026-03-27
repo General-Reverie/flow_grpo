@@ -70,12 +70,8 @@ def pipeline_with_logprob(
         )
     else:
         # When prompt_embeds are pre-computed, generate text_ids from shape
-        text_ids = self._prepare_text_ids(
-            batch_size=batch_size * num_images_per_prompt,
-            max_sequence_length=prompt_embeds.shape[1],
-            device=device,
-            dtype=prompt_embeds.dtype,
-        )
+        # Klein's _prepare_text_ids takes the embeddings tensor directly
+        text_ids = self._prepare_text_ids(prompt_embeds)
 
     # 3. Prepare latent variables
     # Klein: in_channels=128, packing factor=4 → num_channels_latents=32
@@ -93,7 +89,7 @@ def pipeline_with_logprob(
 
     # 4. Prepare timesteps with empirical mu shift
     image_seq_len = latents.shape[1]
-    mu = self.compute_empirical_mu(image_seq_len)
+    mu = self.compute_empirical_mu(image_seq_len, num_inference_steps)
     timesteps, num_inference_steps = retrieve_timesteps(
         self.scheduler,
         num_inference_steps,
@@ -146,15 +142,19 @@ def pipeline_with_logprob(
                 progress_bar.update()
 
     # 6. Decode latents to images
-    # Klein uses _unpack_latents_with_ids or standard unpack
-    if hasattr(self, '_unpack_latents_with_ids'):
-        latents = self._unpack_latents_with_ids(latents, latent_image_ids, height, width)
-    elif hasattr(self, '_unpack_latents'):
-        latents = self._unpack_latents(latents, height, width, self.vae_scale_factor)
+    # Klein: unpack sequence → spatial, batch norm denormalize, unpatchify, VAE decode
+    latents = self._unpack_latents_with_ids(latents, latent_image_ids)
 
-    # Klein VAE decode path
-    if hasattr(self.vae.config, 'scaling_factor'):
-        latents = (latents / self.vae.config.scaling_factor) + getattr(self.vae.config, 'shift_factor', 0.0)
+    # Batch norm denormalization (Klein-specific, replaces FLUX.1's scaling_factor)
+    latents_bn_mean = self.vae.bn.running_mean.view(1, -1, 1, 1).to(latents.device, latents.dtype)
+    latents_bn_std = torch.sqrt(
+        self.vae.bn.running_var.view(1, -1, 1, 1) + self.vae.config.batch_norm_eps
+    ).to(latents.device, latents.dtype)
+    latents = latents * latents_bn_std + latents_bn_mean
+
+    # Unpatchify: reverse 2x2 patch packing
+    latents = self._unpatchify_latents(latents)
+
     latents = latents.to(dtype=self.vae.dtype)
     image = self.vae.decode(latents, return_dict=False)[0]
     image = self.image_processor.postprocess(image, output_type=output_type)
