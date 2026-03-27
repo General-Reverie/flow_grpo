@@ -1015,5 +1015,159 @@ def pickscore_bagel_lora():
     return config
 
 
+###############################################################################
+# FLUX.2 Klein-base-4B configs
+###############################################################################
+
+def pickscore_klein_base_4b():
+    """
+    Flow-GRPO with PickScore reward on FLUX.2 Klein-base-4B (non-distilled).
+    Designed for 4x A100-80GB or equivalent cloud GPUs.
+    Uses LoRA + bf16 for memory efficiency.
+    """
+    gpu_number = 4
+    config = compressibility()
+    config.dataset = os.path.join(os.getcwd(), "dataset/pickscore")
+
+    # Klein-base-4B (non-distilled, full denoising trajectory)
+    config.run_name = "[klein-base-4b-pickscore-lora]-4gpu"
+    config.pretrained.model = "black-forest-labs/FLUX.2-klein-base-4B"
+    config.sample.num_steps = 20          # More steps than FLUX.1 (6) since Klein-base isn't few-step optimized
+    config.sample.eval_num_steps = 50     # Full eval steps
+    config.sample.guidance_scale = 4.0    # Klein default
+
+    config.resolution = 512
+    config.mixed_precision = "bf16"       # Mandatory for FLUX family
+
+    config.sample.train_batch_size = 2    # Conservative for 4B model + reward model
+    config.sample.num_image_per_prompt = 16
+    config.sample.num_batches_per_epoch = int(48 / (gpu_number * config.sample.train_batch_size / config.sample.num_image_per_prompt))
+    config.sample.test_batch_size = 4
+
+    config.train.batch_size = config.sample.train_batch_size
+    config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch // 2
+    config.train.num_inner_epochs = 1
+    config.train.timestep_fraction = 0.99
+    config.train.beta = 0                 # No KL loss (following FLUX convention)
+    config.train.clip_range = 1e-4
+    config.train.ema = True
+    config.train.learning_rate = 3e-4
+
+    config.use_lora = True
+    config.sample.global_std = True
+    config.sample.same_latent = False
+    config.sample.noise_level = 0.9       # Match FLUX.1 setting
+
+    config.save_freq = 30
+    config.eval_freq = 30
+    config.save_dir = "logs/pickscore/klein-base-4b"
+    config.reward_fn = {
+        "pickscore": 1.0,
+    }
+    config.prompt_fn = "general_ocr"
+    config.per_prompt_stat_tracking = True
+
+    return config
+
+
+def pickscore_klein_base_4b_fast():
+    """
+    Flow-GRPO-Fast variant for Klein-base-4B.
+    Trains on only 2-3 SDE window steps per trajectory for efficiency.
+    """
+    gpu_number = 4
+    config = compressibility()
+    config.dataset = os.path.join(os.getcwd(), "dataset/pickscore")
+
+    config.run_name = "[klein-base-4b-pickscore-fast]-4gpu"
+    config.pretrained.model = "black-forest-labs/FLUX.2-klein-base-4B"
+    config.sample.num_steps = 20
+    config.sample.eval_num_steps = 50
+    config.sample.guidance_scale = 4.0
+    config.sample.eval_guidance_scale = 4.0
+
+    config.resolution = 512
+    config.mixed_precision = "bf16"
+
+    config.sample.train_batch_size = 2
+    config.sample.num_image_per_prompt = 16
+    config.sample.num_batches_per_epoch = int(48 / (gpu_number * config.sample.train_batch_size / config.sample.num_image_per_prompt))
+    config.sample.test_batch_size = 4
+
+    config.train.batch_size = config.sample.train_batch_size
+    config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch // 2
+    config.train.num_inner_epochs = 1
+    config.train.beta = 0
+    config.train.clip_range = 1e-5        # Smaller for Fast variant (per README)
+    config.train.ema = True
+
+    config.use_lora = True
+    config.sample.global_std = True
+    config.sample.same_latent = False
+    config.sample.noise_level = 0.8
+    config.sample.sde_window_size = 3     # Train on 3 SDE steps
+    config.sample.sde_window_range = (0, 10)  # Window in first half of trajectory
+    config.sample.sde_type = "cps"        # Coefficients-Preserving Sampling
+
+    config.save_freq = 30
+    config.eval_freq = 30
+    config.save_dir = "logs/pickscore/klein-base-4b-fast"
+    config.reward_fn = {
+        "pickscore": 1.0,
+    }
+    config.prompt_fn = "general_ocr"
+    config.per_prompt_stat_tracking = True
+
+    return config
+
+
+def pickscore_klein_base_4b_2gpu():
+    """
+    Minimal 2-GPU config for local fleet testing (2x RTX 5090 32GB).
+    Aggressive memory settings: small batch, LoRA, activation checkpointing.
+    """
+    gpu_number = 2
+    config = compressibility()
+    config.dataset = os.path.join(os.getcwd(), "dataset/pickscore")
+
+    config.run_name = "[klein-base-4b-pickscore-lora]-2gpu"
+    config.pretrained.model = "black-forest-labs/FLUX.2-klein-base-4B"
+    config.sample.num_steps = 20
+    config.sample.eval_num_steps = 50
+    config.sample.guidance_scale = 4.0
+
+    config.resolution = 512
+    config.mixed_precision = "bf16"
+
+    config.sample.train_batch_size = 1    # Minimal for VRAM
+    config.sample.num_image_per_prompt = 8  # Smaller group size
+    config.sample.num_batches_per_epoch = int(48 / (gpu_number * config.sample.train_batch_size / config.sample.num_image_per_prompt))
+    config.sample.test_batch_size = 2
+
+    config.train.batch_size = config.sample.train_batch_size
+    config.train.gradient_accumulation_steps = config.sample.num_batches_per_epoch // 2
+    config.train.num_inner_epochs = 1
+    config.train.beta = 0
+    config.train.clip_range = 1e-4
+    config.train.ema = True
+
+    config.use_lora = True
+    config.activation_checkpointing = True
+    config.sample.global_std = True
+    config.sample.same_latent = False
+    config.sample.noise_level = 0.9
+
+    config.save_freq = 30
+    config.eval_freq = 30
+    config.save_dir = "logs/pickscore/klein-base-4b-2gpu"
+    config.reward_fn = {
+        "pickscore": 1.0,
+    }
+    config.prompt_fn = "general_ocr"
+    config.per_prompt_stat_tracking = True
+
+    return config
+
+
 def get_config(name):
     return globals()[name]()
