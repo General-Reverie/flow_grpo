@@ -3,12 +3,12 @@ agents_plan_schema: '1.0'
 checkboxes: 12/12
 created: '2026-03-27'
 date: '2026-03-27'
-last_swept: '2026-05-02T22:34:13Z'
-plan_id: streamed-wondering-scroll
+last_swept: '2026-05-02T08:42:12Z'
+plan_id: commit-klein-adapter-fix-deps-smoke-test-fleet
 project: petridish/flow_grpo
 provenance:
   created_by: claude-code
-  created_from: active_plan_reset_vetting
+  created_from: legacy_plan_metadata
 revision: 1
 source: claude-code
 status: completed
@@ -26,7 +26,7 @@ updated: '2026-05-02'
 ## Changelog
 
 ### 2026-05-02
-- Backfilled v1.0 provenance metadata during active plan reset vetting.
+- Backfilled provenance metadata from existing plan frontmatter and filesystem metadata.
 
 ## Where We Are
 > Project: flow_grpo (Klein-base-4B port) | Location: `~/dev/petridish/flow_grpo`

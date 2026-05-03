@@ -1,11 +1,37 @@
 ---
-date: 2026-03-27
-status: approved
-tags: [flow-grpo, klein, flux2, rl, diffusion, training, research]
+agents_plan_schema: '1.0'
+archive_reason: stale plan queue purge
+created: '2026-03-27'
+date: '2026-03-27'
+plan_id: flow-grpo-klein-base-4b
+project: petridish/flow_grpo
+provenance:
+  created_by: claude-code
+  created_from: legacy_plan_metadata
+revision: 1
 source: claude-code
+stale_review_decision: archived
+stale_review_resolved: '2026-05-02'
+status: archived
+tags:
+- flow-grpo
+- klein
+- flux2
+- rl
+- diffusion
+- training
+- research
+title: 'Flow-GRPO + Klein-base-4B: Test Project Plan'
+updated: '2026-05-02'
 ---
 
 # Flow-GRPO + Klein-base-4B: Test Project Plan
+
+
+## Changelog
+
+### 2026-05-02
+- Backfilled provenance metadata from existing plan frontmatter and filesystem metadata.
 
 ## Context
 
